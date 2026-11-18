@@ -169,6 +169,14 @@ label.ck{display:flex;gap:8px;align-items:flex-start;margin:8px 0 0;font-size:.9
 .kvt{width:100%}.kvt td{vertical-align:middle;white-space:normal!important}.kvt td small{display:block;color:var(--muted);font-weight:400;margin-top:2px}.kvt td:last-child{white-space:nowrap;width:1%}.kvt input{width:130px}.kvt #fpSil{width:70px}
 
 /* ---------- AJ Sales ---------- */
+.cd .sv,.cal .sv{font-size:.72rem;font-weight:700;background:var(--brand2);color:var(--brand);border-radius:4px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.cd .ev,.cal .ev{font-size:.68rem;background:var(--danger2);color:var(--danger);border-radius:4px;padding:0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.cd.opn{border-style:dashed}.cd .rs.neg{color:var(--danger)}
+.calsum{display:flex;gap:14px;flex-wrap:wrap;font-size:.86rem;color:var(--muted)}.calsum b{color:var(--ink);font-variant-numeric:tabular-nums}.calsum b.neg{color:var(--danger)}
+.calpop .cnt b.neg{color:var(--danger)}.calpop .pl small{color:var(--muted)}
+.t.grid th:first-child,.t.grid td:first-child{min-width:120px;-webkit-transform:translate3d(0,0,0);transform:translate3d(0,0,0)}.t.grid thead tr+tr th:first-child{left:auto;min-width:0;max-width:none;text-align:right!important;z-index:2;-webkit-transform:none;transform:none}.t.grid thead tr:first-child th:first-child{z-index:4;background:#f7faf9}.t.grid tfoot td:first-child{z-index:3;background:#eef6f3}
+
+.tabwarn{margin:10px 16px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .g2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:12px;margin-top:12px}.g2>.card{margin:0}
 .kpi small{display:block;font-size:.76rem;color:var(--muted);margin-top:2px}
 .alert.ok{background:var(--ok2);color:var(--ok);border-color:#b7e4cf}.alert.warn{background:var(--warn2)}
@@ -243,8 +251,8 @@ const cmp=(a,b)=>String(a==null?'':a).localeCompare(String(b==null?'':b),undefin
 const slug=s=>String(s||'').replace(/[^\w]+/g,'_').replace(/^_|_$/g,'').slice(0,40)||'file';
 
 const IDB={db:null,
- open(){return new Promise(res=>{try{const r=indexedDB.open('ajsales',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{IDB.db=r.result;res(true)};r.onerror=()=>res(false);r.onblocked=()=>res(false)}catch(e){res(false)}})},
- get(k){return new Promise(res=>{try{const q=IDB.db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)}catch(e){res(null)}})},
+ open(){return new Promise(res=>{const to=setTimeout(()=>res(false),2500);const ok=v=>{clearTimeout(to);res(v)};try{const r=indexedDB.open('ajsales',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{IDB.db=r.result;ok(true)};r.onerror=()=>ok(false);r.onblocked=()=>ok(false)}catch(e){ok(false)}})},
+ get(k){return new Promise(res=>{setTimeout(()=>res(null),2500);try{const q=IDB.db.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result||null);q.onerror=()=>res(null)}catch(e){res(null)}})},
  put(k,v){return new Promise(res=>{try{const t=IDB.db.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=()=>res(true);t.onerror=()=>res(false);t.onabort=()=>res(false)}catch(e){res(false)}})}};
 
 
@@ -288,6 +296,7 @@ function save(now,silent){dirty=true;if(!silent&&DB)DB.meta.rev=(DB.meta.rev||0)
  const go=async()=>{DB.meta.savedAt=new Date().toISOString();const s=JSON.stringify(DB);let ok=false,ls=false;
   try{localStorage.setItem(KEY,s);ls=true}catch(e){try{localStorage.removeItem(KEY)}catch(x){}}
   if(IDB.db)ok=await IDB.put(KEY,s);
+  if((ok||ls)&&window.__ajch)try{window.__ajch.postMessage('saved')}catch(e){}
   if(ok||ls){dirty=false;$('#saveSt').textContent='All changes saved';if(window.bkStatus)bkStatus()}else{$('#saveSt').textContent='NOT SAVED';toast('Could not save: browser storage is full or blocked. Download a backup now (Settings › Backup & data).','bad',9000)}};
  if(now)go();else saveT=setTimeout(go,300)}
 window.addEventListener('beforeunload',e=>{if(dirty)save(true)});
@@ -531,7 +540,7 @@ PAGES.dash={title:'Dashboard',render(v){
  if(!DB.counters.length&&!DB.slips.length){v.innerHTML='<div class="card"><h2>Welcome to AJ Sales</h2><p>Record each counter’s daily sales slip, the store’s expenses, bank deposits and what partners still owe you, all on this computer.</p><ol class="steps"><li>Set your counters, cashiers and payment options in <a href="#set/ctr">Settings</a>.</li><li>Or bring in your existing sales and expenses sheet in <a href="#set/imp">Settings › Import</a>.</li><li>Enter each day in <a href="#day">Daily Sales</a>, then close the day.</li></ol></div>';return}
  const ld=lastSalesDay()||today(),mk=ym(today())>ym(ld)&&!DB.slips.some(s=>ym(s.date)===ym(today()))?ym(ld):ym(today()),[a,b]=monthRange(mk);
  const L=slipsIn(a,b),T=totals(L),E=sum(expsIn(a,b),'amt'),days=[...new Set(L.map(s=>s.date))].length,dT=totals(slipsOn(ld));
- const data=[];for(let d=a;d<=b;d=addDays(d,1)){const t=totals(slipsOn(d));data.push({v:t.sales,l:String(+d.slice(8)),t:fdw(d),c:dayStatus(d)==='closed'||!t.n?'':'open'})}
+ if(!calF.y){calF.y=+mk.slice(0,4);calF.m=+mk.slice(5,7)}
  const openDays=[...new Set(DB.slips.map(s=>s.date))].filter(d=>dayStatus(d)!=='closed').sort();
  const B=balances(today()),soon=B.pdcList.filter(c=>c.date<=addDays(today(),7)).length;
  const repaT=sum(Object.values(B.repa),x=>x),recvT=sum(Object.values(B.recv),x=>x);
@@ -541,13 +550,52 @@ PAGES.dash={title:'Dashboard',render(v){
   +'<div class="kpi"><span>Sales less expenses</span><b>₱'+n2(T.sales-E)+'</b><small>'+esc(monthLabel(mk))+'</small></div></div>'
   +(openDays.length?'<div class="alert warn" style="margin-top:10px">'+openDays.length+' day'+(openDays.length>1?'s are':' is')+' not closed yet: '+openDays.slice(-6).map(d=>'<a href="#day/'+d+'">'+esc(fd(d))+'</a>').join(', ')+(openDays.length>6?' …':'')+'</div>':'')
   +(soon?'<div class="alert info" style="margin-top:10px">'+soon+' postdated check'+(soon>1?'s are':' is')+' due within 7 days. <a href="#checks">Open checks</a></div>':'')
-  +'<div class="g2"><div class="card"><h2>Daily sales, '+esc(monthLabel(mk))+'</h2>'+bars(data)+'<p class="note">Lighter bars are days not closed yet.</p></div>'
+  +'<div class="card" style="margin-top:12px" id="dashCal"></div><div class="g2">'
   +'<div class="card"><h2>Balances today</h2><table class="t kvt"><tbody><tr><td>Cash on hand</td><td class="n">'+n2(B.cash)+'</td></tr><tr><td>Due from Maya (kiosk)</td><td class="n">'+n2(B.kiosk)+'</td></tr><tr><td>Checks on hand</td><td class="n">'+n2(B.check)+'</td></tr>'
   +DB.opts.filter(o=>o.kind==='recv').map(o=>'<tr><td>Due from '+esc(o.name)+'</td><td class="n">'+n2(B.recv[o.id]||0)+'</td></tr>').join('')+'<tr><td>Repa deposits held</td><td class="n">'+n2(repaT+B.unassigned)+'</td></tr></tbody></table>'
   +(S().start?'<p class="note">Counted from '+esc(fd(S().start))+'. <a href="#bal">Details</a></p>':'<p class="note">Set the start date and opening balances in <a href="#set/bal">Settings › Balances</a>.</p>')+'</div></div>'
   +'<div class="g2"><div class="card"><h2>By payment option</h2>'+hbars(Object.entries(T.by).map(([k,x])=>({l:optById(k).name,v:x})).sort((x,y)=>y.v-x.v))+'</div>'
   +'<div class="card"><h2>By counter</h2>'+hbars(DB.counters.slice().sort(ctrSort).map(c=>({l:c.name,v:totals(L.filter(s=>s.counter===c.id)).sales})).filter(x=>x.v))+'</div></div>';
+ renderSalesCal($('#dashCal'));
 }};
+
+// ---------------------------------------------------------------- calendar: each day's sales and expenses (same look as the payroll calendar)
+let calF={y:0,m:0,sel:''};
+const WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const k2=c=>{const v=c/100;return Math.abs(v)>=100000?(v/1000).toFixed(0)+'k':Math.abs(v)>=10000?(v/1000).toFixed(1)+'k':n2(c).replace(/\.00$/,'')};
+function calPopClose(){const p=$('#calP');if(p)p.remove()}
+document.addEventListener('click',e=>{const p=$('#calP');if(p&&!p.contains(e.target)&&!e.target.closest('.cd'))calPopClose()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')calPopClose()});
+window.addEventListener('hashchange',calPopClose);
+function dayFig(d){const L=slipsOn(d),t=totals(L),E=expsIn(d,d);return{L,t,E,exp:sum(E,'amt'),st:dayStatus(d)}}
+function renderSalesCal(el){if(!el)return;calPopClose();const y=calF.y,m=calF.m,first=new Date(y,m-1,1).getDay(),nd=lastDay(y,m),t=today(),[a,b]=monthRange(ymd(y,m,1).slice(0,7));
+ const mt=totals(slipsIn(a,b)),me=sum(expsIn(a,b),'amt');
+ let h='<div class="cal"><div class="row mid calh"><button class="btn o s" data-cm="-1" aria-label="Previous month">‹</button><h2 style="margin:0;min-width:170px;text-align:center">'+MN[m-1]+' '+y+'</h2><button class="btn o s" data-cm="1" aria-label="Next month">›</button><button class="btn o s" data-cm="0">Today</button><span class="sp"></span>'
+  +'<div class="calsum"><span>Sales <b>₱'+n2(mt.sales)+'</b></span><span>Expenses <b>₱'+n2(me)+'</b></span><span>Net <b class="'+(mt.sales-me<0?'neg':'')+'">₱'+n2(mt.sales-me)+'</b></span></div></div>'
+  +'<div class="cg">'+WD.map(w=>'<div class="cw">'+w+'</div>').join('');
+ for(let i=0;i<first;i++)h+='<div class="cd x"></div>';
+ for(let dd=1;dd<=nd;dd++){const d=ymd(y,m,dd),F=dayFig(d),has=F.L.length||F.E.length;
+  h+='<button type="button" class="cd'+(d===t?' td':'')+(d===calF.sel?' sel':'')+(F.L.length&&F.st!=='closed'?' opn':'')+'" data-cd="'+d+'" aria-label="'+esc(fdw(d))+': sales ₱'+n2(F.t.sales)+', expenses ₱'+n2(F.exp)+'"><span class="dn">'+dd+'</span>'
+   +(F.L.length?'<span class="sv" title="Sales ₱'+n2(F.t.sales)+'">₱'+k2(F.t.sales)+'</span>':'')
+   +(F.E.length?'<span class="ev" title="Expenses ₱'+n2(F.exp)+'">− ₱'+k2(F.exp)+'</span>':'')
+   +(F.L.length&&F.st!=='closed'?'<span class="rs">not closed</span>':F.t.vr&&Math.abs(F.t.vr)>S().tol?'<span class="rs neg">variance '+n2(F.t.vr)+'</span>':'')+'</button>'}
+ h+='</div><p class="note" style="margin:6px 0 0"><span class="sv" style="display:inline-block">₱ sales</span> sales after variance · <span class="ev" style="display:inline-block">− ₱ expenses</span> expenses that day · click a date for details.</p></div>';
+ el.innerHTML=h;
+ $$('[data-cm]',el).forEach(x=>x.onclick=()=>{const k=+x.dataset.cm;if(!k){const n=new Date();calF.y=n.getFullYear();calF.m=n.getMonth()+1;calF.sel=today()}else{calF.m+=k;if(calF.m<1){calF.m=12;calF.y--}if(calF.m>12){calF.m=1;calF.y++}}renderSalesCal(el)});
+ $$('[data-cd]',el).forEach(x=>x.onclick=ev=>{ev.stopPropagation();calF.sel=x.dataset.cd;$$('.cd.sel',el).forEach(z=>z.classList.remove('sel'));x.classList.add('sel');pop(x)});
+ const pop=cell=>{calPopClose();const d=calF.sel,F=dayFig(d),net=F.t.sales-F.exp;
+  const p=document.createElement('div');p.className='calpop';p.id='calP';p.setAttribute('role','dialog');p.setAttribute('aria-label',fdw(d));
+  p.innerHTML='<div class="row mid" style="gap:6px"><b>'+esc(fdw(d))+'</b>'+(F.L.length?(F.st==='closed'?'<span class="chip ok">Closed</span>':'<span class="chip warn">Open</span>'):'')+'<span class="sp"></span><button class="x" aria-label="Close">×</button></div>'
+   +'<div class="cnt"><span><b>'+n2(F.t.sales)+'</b>sales</span><span><b>'+n2(F.exp)+'</b>expenses</span><span><b class="'+(net<0?'neg':'')+'">'+n2(net)+'</b>net</span></div>'
+   +(F.L.length?'<div class="pg"><h4>By counter</h4>'+F.L.slice().sort((x,y)=>ctrSort(ctrById(x.counter),ctrById(y.counter))).map(s=>{const c=slipCalc(s);return '<div class="pl row" style="gap:6px"><span>'+esc(ctrById(s.counter).name)+(s.cashier&&cshById(s.cashier)?' · '+esc(cshById(s.cashier).name):'')+'</span><span class="sp"></span><span>'+n2(c.sales)+(c.vr?' <small class="'+(c.vr<0?'neg':'')+'">('+(c.vr>0?'+':'')+n2(c.vr)+')</small>':'')+'</span></div>'}).join('')+'</div>'
+    +'<div class="pg"><h4>By payment option</h4>'+Object.entries(F.t.by).map(([k,v])=>'<div class="pl row" style="gap:6px"><span>'+esc(optById(k).name)+'</span><span class="sp"></span><span>'+n2(v)+'</span></div>').join('')+'</div>':'<p class="note" style="margin:8px 0 0">No sales entered.</p>')
+   +(F.E.length?'<div class="pg"><h4>Expenses ('+F.E.length+')</h4>'+F.E.slice(0,8).map(e=>'<div class="pl row" style="gap:6px"><span>'+esc(e.part||catById(e.cat).name)+'</span><span class="sp"></span><span>'+n2(e.amt)+'</span></div>').join('')+(F.E.length>8?'<div class="note">and '+(F.E.length-8)+' more</div>':'')+'</div>':'')
+   +'<div class="row" style="margin-top:8px;gap:6px"><a class="btn s" href="#day/'+d+'">'+(F.L.length?'Open the day':'Enter sales')+'</a><a class="btn o s" href="#exp/'+d+'">'+(F.E.length?'Expenses':'+ Expense')+'</a></div>';
+  document.body.appendChild(p);
+  const r=cell.getBoundingClientRect(),w=p.offsetWidth,hh=p.offsetHeight,vw=innerWidth,vh=innerHeight;
+  let x=r.right+6,yy=r.top;if(x+w>vw-8)x=r.left-w-6;if(x<8)x=Math.max(8,Math.min(vw-w-8,r.left));yy=Math.max(8,Math.min(vh-hh-8,yy));if(x===r.left)yy=Math.min(vh-hh-8,r.bottom+6);
+  p.style.left=x+'px';p.style.top=yy+'px';$('.x',p).onclick=calPopClose;$$('a',p).forEach(a=>a.addEventListener('click',calPopClose));setTimeout(()=>$('.x',p).focus(),0)};
+}
 
 
 // =====================================================================================
@@ -567,10 +615,11 @@ PAGES.day={title:'Daily Sales',render(v,a){
  v.innerHTML='<div class="row mid daybar"><button class="btn o s" id="dPrev" aria-label="Previous day">‹</button><input type="date" id="dDate" value="'+d+'"><button class="btn o s" id="dNext" aria-label="Next day">›</button><button class="btn o s" id="dToday">Today</button>'
   +'<b class="dlong">'+esc(new Date(d+'T00:00').toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}))+'</b>'
   +(closed?'<span class="chip ok">Closed'+(info.at?' · '+esc(new Date(info.at).toLocaleDateString('en-US',{month:'short',day:'numeric'})):'')+'</span>':'<span class="chip warn">Open</span>')+(info.src==='import'?'<span class="chip">Imported</span>':'')
-  +'<span class="sp"></span><button class="btn o s" id="dPrint">Print slips</button><button class="btn o s" id="dBlank">Blank slips</button>'+(closed?'<button class="btn o" id="dReopen">Reopen day</button>':'<button class="btn" id="dClose">Close day…</button>')+'</div>'
+  +'<span class="sp"></span><button class="btn o s" id="dPaste">Paste from spreadsheet</button><button class="btn o s" id="dPrint">Print slips</button><button class="btn o s" id="dBlank">Blank slips</button>'+(closed?'<button class="btn o" id="dReopen">Reopen day</button>':'<button class="btn" id="dClose">Close day…</button>')+'</div>'
   +'<div class="out daysum" id="dSum"></div>'
   +(closed?'<div class="hline">This day is closed. Reopen it to make changes.</div>':'')
   +'<div class="slips" id="dSlips">'+ctrs.map(c=>'<div class="card slipc" data-c="'+esc(c.id)+'"></div>').join('')+'</div>';
+ $('#dPaste').onclick=()=>openPaste(()=>PAGES.day.render(v,d));
  $('#dDate').onchange=e=>e.target.value&&go('day',e.target.value);
  $('#dPrev').onclick=()=>go('day',addDays(d,-1));$('#dNext').onclick=()=>go('day',addDays(d,1));$('#dToday').onclick=()=>go('day',today());
  $('#dPrint').onclick=()=>{const L=ctrs.map(c=>slipOf(d,c.id)).filter(Boolean);if(!L.length)return toast('No slips entered for this day yet.','bad');printHtml(slipSheets(L.map(s=>({s,c:ctrById(s.counter),d}))),false,'Counter slips '+d)};
@@ -681,7 +730,7 @@ PAGES.exp={title:'Expenses',render(v,a){
  const byC={};L.forEach(e=>byC[e.cat]=(byC[e.cat]||0)+e.amt);
  v.innerHTML='<div class="card"><h2>Add an expense</h2><div class="row exadd">'+fg('Date','<input type="date" id="xD" value="'+esc(expF.day||(ym(today())===expF.m?today():b0))+'">')+fg('Particulars','<input id="xP" placeholder="e.g. Diesel for delivery truck" list="xPl"><datalist id="xPl">'+[...new Set(DB.exps.map(e=>e.part))].slice(-200).map(p=>'<option value="'+esc(p)+'">').join('')+'</datalist>')
   +fg('Paid by','<select id="xM">'+opt((S().modes||[]).map(m=>m.name),'Cash')+'</select>')+fg('Category','<select id="xC"><option value="">Choose…</option>'+opt(catsOn().map(c=>[c.id,c.name]))+'</select>')+fg('Amount (₱)','<input id="xA" class="num" inputmode="decimal">')+fg('OR / reference','<input id="xR" placeholder="optional">')+'<div class="fg"><label>&nbsp;</label><button class="btn" id="xGo">Add</button></div></div></div>'
-  +'<div class="card"><div class="row mid"><h2 style="margin:0">'+(expF.day?esc(fd(expF.day)):esc(monthLabel(expF.m)))+'</h2><span class="sp"></span><select id="xFm" aria-label="Month">'+opt(months.map(k=>[k,monthLabel(k)]),expF.m)+'</select>'+(expF.day?'<button class="btn o s" id="xAll">Whole month</button>':'')+'<select id="xFc" aria-label="Category"><option value="">All categories</option>'+opt(DB.cats.map(c=>[c.id,c.name]),expF.cat)+'</select><input id="xQ" placeholder="Find" value="'+esc(expF.q)+'" style="width:150px"><button class="btn o s" id="xCsv">Export CSV</button></div>'
+  +'<div class="card"><div class="row mid"><h2 style="margin:0">'+(expF.day?esc(fd(expF.day)):esc(monthLabel(expF.m)))+'</h2><span class="sp"></span><select id="xFm" aria-label="Month">'+opt(months.map(k=>[k,monthLabel(k)]),expF.m)+'</select>'+(expF.day?'<button class="btn o s" id="xAll">Whole month</button>':'')+'<select id="xFc" aria-label="Category"><option value="">All categories</option>'+opt(DB.cats.map(c=>[c.id,c.name]),expF.cat)+'</select><input id="xQ" placeholder="Find" value="'+esc(expF.q)+'" style="width:150px"><button class="btn o s" id="xPaste">Paste</button><button class="btn o s" id="xCsv">Export CSV</button></div>'
   +'<div class="tw"><table class="t"><thead><tr><th>Date</th><th>Particulars</th><th>Paid by</th><th>Category</th><th>Reference</th><th class="n">Amount</th></tr></thead><tbody>'
   +(L.length?L.map(e=>'<tr><td>'+esc(fd(e.date))+'</td><td><button class="nmlink" data-e="'+e.id+'">'+esc(e.part||'(no particulars)')+'</button></td><td>'+esc(e.mode||'')+'</td><td>'+esc(catById(e.cat).name)+'</td><td>'+esc(e.ref||'')+'</td><td class="n">'+n2(e.amt)+'</td></tr>').join(''):'<tr><td colspan="6" class="empty">No expenses'+(q||expF.cat?' match':' yet')+'.</td></tr>')
   +'</tbody>'+(L.length?'<tfoot><tr class="gt"><td colspan="5">TOTAL ('+L.length+')</td><td class="n">'+n2(sum(L,'amt'))+'</td></tr></tfoot>':'')+'</table></div>'
@@ -695,6 +744,7 @@ PAGES.exp={title:'Expenses',render(v,a){
  $('#xFm').onchange=e=>{expF.m=e.target.value;expF.day='';go('exp')};const al=$('#xAll');if(al)al.onclick=()=>{expF.day='';go('exp')};
  $('#xFc').onchange=e=>{expF.cat=e.target.value;PAGES.exp.render(v,'')};
  $('#xQ').oninput=e=>{expF.q=e.target.value;clearTimeout(expF.t);expF.t=setTimeout(()=>{PAGES.exp.render(v,'');const i=$('#xQ');i.focus();i.setSelectionRange(i.value.length,i.value.length)},250)};
+ $('#xPaste').onclick=()=>openPaste(()=>PAGES.exp.render(v,''));
  $('#xCsv').onclick=()=>dl('Expenses_'+(expF.day||expF.m)+'.csv',toCsv([['Date','Particulars','Mode of Payment','Category','Reference','Amount']].concat(L.slice().reverse().map(e=>[e.date,e.part,e.mode,catById(e.cat).name,e.ref||'',p2(e.amt)]))));
  $$('[data-e]',v).forEach(b=>b.onclick=()=>expForm(b.dataset.e,()=>PAGES.exp.render(v,'')));
 }};
@@ -915,16 +965,40 @@ function xlNum(v){if(typeof v==='number')return Math.round(v*100);return v==null
 function findTable(rows,need){for(let i=0;i<Math.min(rows.length,15);i++){const H=(rows[i]||[]).map(normH),ix={};let ok=true;for(const [k,alts] of Object.entries(need)){const j=H.findIndex(h=>alts.includes(h));if(j<0){ok=false;break}ix[k]=j}if(ok)return{start:i+1,ix}}return null}
 const SALES_H={date:['date'],ctr:['counter'],type:['type','paymenttype'],amt:['amount']};
 const EXP_H={date:['date'],part:['particulars','description'],mode:['modeofpayment','mode','paidby'],cat:['category'],amt:['amount']};
-function parseBook(wb){
- const out={sales:[],exps:[],blank:[],bad:[]};
- wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null});
-  const s=findTable(rows,SALES_H),e=!s&&findTable(rows,EXP_H);
-  if(s)rows.slice(s.start).forEach((r,k)=>{const d=xlDate(r[s.ix.date]),c=String(r[s.ix.ctr]||'').trim(),t=String(r[s.ix.type]||'').trim(),a=xlNum(r[s.ix.amt]);if(!d&&!c&&!t&&a==null)return;
-   if(a==null||!a){if(d||c||t)out.blank.push({sheet:n,row:s.start+k+1,d,c,t});return}if(!d||!c||!t){out.bad.push({sheet:n,row:s.start+k+1,why:'missing date, counter or type'});return}out.sales.push({sheet:n,row:s.start+k+1,d,c,t,a})});
-  else if(e)rows.slice(e.start).forEach((r,k)=>{const d=xlDate(r[e.ix.date]),a=xlNum(r[e.ix.amt]),p=String(r[e.ix.part]||'').trim();if(!d&&a==null&&!p)return;
-   if(!a){out.blank.push({sheet:n,row:e.start+k+1,d,c:'expense',t:p});return}if(!d){out.bad.push({sheet:n,row:e.start+k+1,why:'no date'});return}
-   out.exps.push({row:e.start+k+1,d,part:p,mode:String(r[e.ix.mode]||'').trim(),cat:String(r[e.ix.cat]||'').trim(),a})})});
+function parseRows(rows,n,out){
+ const s=findTable(rows,SALES_H),e=!s&&findTable(rows,EXP_H);
+ const addS=(r,ix,row)=>{const d=xlDate(r[ix.date]),c=String(r[ix.ctr]||'').trim(),t=String(r[ix.type]||'').trim(),a=xlNum(r[ix.amt]);if(!d&&!c&&!t&&a==null)return;
+  if(a==null||!a){if(d||c||t)out.blank.push({sheet:n,row,d,c,t});return}if(!d||!c||!t){out.bad.push({sheet:n,row,why:'missing date, counter or type'});return}out.sales.push({sheet:n,row,d,c,t,a})};
+ const addE=(r,ix,row)=>{const d=xlDate(r[ix.date]),a=xlNum(r[ix.amt]),p=String(r[ix.part]||'').trim();if(!d&&a==null&&!p)return;
+  if(!a){out.blank.push({sheet:n,row,d,c:'expense',t:p});return}if(!d){out.bad.push({sheet:n,row,why:'no date'});return}
+  out.exps.push({row,d,part:p,mode:String(r[ix.mode]||'').trim(),cat:String(r[ix.cat]||'').trim(),a})};
+ if(s)rows.slice(s.start).forEach((r,k)=>addS(r,s.ix,s.start+k+1));
+ else if(e)rows.slice(e.start).forEach((r,k)=>addE(r,e.ix,e.start+k+1));
+ else rows.forEach((r,k)=>{// no header row: read each line by its shape
+  const c=r.map(x=>x==null?'':x),num=v=>v!==''&&/^[-₱\s\d,.]+$/.test(String(v))&&xlNum(v)!=null;
+  if(!xlDate(c[0])){if(c.some(v=>String(v).trim()!==''))out.bad.push({sheet:n,row:k+1,why:'no date in the first column'});return}
+  if(c.length>=5&&num(c[4])&&!num(c[3]))addE(c,{date:0,part:1,mode:2,cat:3,amt:4},k+1);
+  else if(c.length>=4&&(num(c[3])||String(c[3]).trim()===''))addS(c,{date:0,ctr:1,type:2,amt:3},k+1);
+  else out.bad.push({sheet:n,row:k+1,why:'not Date, Counter, Type, Amount or Date, Particulars, Mode, Category, Amount'})})}
+function parseBook(wb){const out={sales:[],exps:[],blank:[],bad:[]};
+ wb.SheetNames.forEach(n=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null});if(findTable(rows,SALES_H)||findTable(rows,EXP_H))parseRows(rows,n,out)});
  return out}
+// rows copied from Google Sheets or Excel arrive as tab-separated text
+function parsePaste(txt){const t=String(txt||'').replace(/^\ufeff/,'');
+ const rows=t.includes('\t')?t.split(/\r?\n/).map(l=>l.split('\t').map(x=>x.trim().replace(/^"(.*)"$/,'$1'))).filter(r=>r.some(v=>v!=='')):parseCsv(t);
+ const out={sales:[],exps:[],blank:[],bad:[]};parseRows(rows,'pasted',out);return out}
+function openPaste(after){
+ const m=modal('<h2>Paste sales or expenses</h2><p class="note">Copy rows from Google Sheets or Excel and paste them here. With or without the header row.</p>'
+  +'<ul class="steps" style="margin-top:0"><li><b>Sales:</b> Date, Counter, Type, Amount, for example <code>11/9/2026 · Counter 2 · POS Kiosk · 6,512.20</code></li><li><b>Expenses:</b> Date, Particulars, Mode of Payment, Category, Amount</li></ul>'
+  +'<textarea id="ppTx" rows="9" style="width:100%;font-family:ui-monospace,Consolas,monospace;font-size:.8rem" placeholder="Paste here (Ctrl+V)"></textarea><div id="ppPv" class="note" style="margin-top:6px"></div>'
+  +'<div class="acts"><button class="btn o" data-x>Cancel</button><button class="btn" id="ppGo" disabled>Review…</button></div>',820);
+ const tx=$('#ppTx',m),pv=$('#ppPv',m),go_=$('#ppGo',m);let P=null;
+ tx.oninput=()=>{P=parsePaste(tx.value);const d=[...new Set(P.sales.map(x=>x.d))].sort();
+  pv.innerHTML=!tx.value.trim()?'':(P.sales.length?'<b>'+P.sales.length+' sales line'+(P.sales.length>1?'s':'')+'</b>, ₱'+n2(sum(P.sales,'a'))+(d.length?' ('+esc(fd(d[0]))+(d.length>1?' to '+esc(fd(d[d.length-1])):'')+')':''):'No sales lines')+' · '+(P.exps.length?'<b>'+P.exps.length+' expense'+(P.exps.length>1?'s':'')+'</b>, ₱'+n2(sum(P.exps,'a')):'no expenses')
+   +(P.blank.length?' · '+P.blank.length+' without an amount (skipped)':'')+(P.bad.length?'<br><span class="neg">'+P.bad.length+' line'+(P.bad.length>1?'s':'')+' cannot be read, e.g. line '+P.bad[0].row+': '+esc(P.bad[0].why)+'</span>':'');
+  go_.disabled=!(P.sales.length||P.exps.length)};
+ go_.onclick=()=>{if(!P||!(P.sales.length||P.exps.length))return;m.close();previewImport(P,'pasted rows',after)};
+ setTimeout(()=>tx.focus(),0)}
 // "POS Cash" -> {md:'pos', opt}, "Manual FICCO/Others" -> {md:'man', opt}
 function mapType(t){const m=/^(pos|manual|kiosk)\s+(.+)$/i.exec(t);let md='pos',name=t;if(m){md=m[1].toLowerCase()==='manual'?'man':'pos';name=m[2]}
  const n=normH(name);let o=DB.opts.find(x=>normH(x.name)===n)||DB.opts.find(x=>normH(x.name).startsWith(n)||n.startsWith(normH(x.name)));
@@ -939,7 +1013,7 @@ function previewImport(P,fname,after){
  const types=[...new Set(P.sales.map(x=>x.t))],ctrs=[...new Set(P.sales.map(x=>x.c))].sort(cmp),cats=[...new Set(P.exps.map(x=>x.cat).filter(Boolean))];
  const TM={};types.forEach(t=>TM[t]=mapType(t));const unk=types.filter(t=>!TM[t].o);
  const dk=x=>x.d+'|'+x.c+'|'+x.t+'|'+x.a,cnt={};P.sales.forEach(x=>cnt[dk(x)]=(cnt[dk(x)]||0)+1);const dups=Object.entries(cnt).filter(([k,n])=>n>1);
- const dates=[...new Set(P.sales.map(x=>x.d))].sort(),have=new Set(DB.slips.map(s=>s.date)),clash=dates.filter(d=>have.has(d));
+ const dates=[...new Set(P.sales.map(x=>x.d))].sort(),have=new Set(DB.slips.map(s=>s.date)),clash=[...new Set(P.sales.map(x=>{const k=DB.counters.find(z=>normH(z.name)===normH(x.c));return k&&slipOf(x.d,k.id)?x.d+'|'+k.id:''}).filter(Boolean))];void have;
  const ed=new Set(DB.exps.map(e=>e.date+'|'+e.amt+'|'+(e.part||'').toLowerCase())),eDup=P.exps.filter(x=>ed.has(x.d+'|'+x.a+'|'+x.part.toLowerCase()));
  const mon={};P.sales.forEach(x=>mon[x.d.slice(0,7)]=(mon[x.d.slice(0,7)]||0)+x.a);const emon={};P.exps.forEach(x=>emon[x.d.slice(0,7)]=(emon[x.d.slice(0,7)]||0)+x.a);
  const last=dates[dates.length-1]||'',notes=[...new Set(Object.values(TM).map(x=>x.note).filter(Boolean))];
@@ -952,12 +1026,12 @@ function previewImport(P,fname,after){
   +(dups.length?dups.map(([k,n])=>{const [d,c,t,a]=k.split('|');return '<li class="warn">'+esc(fd(d)+', '+c+', '+t+' ₱'+n2(+a))+' appears '+n+' times.</li>'}).join(''):'')
   +(P.blank.length?'<li class="info">'+P.blank.length+' line'+(P.blank.length>1?'s':'')+' with no amount will be skipped'+(P.blank.length<=4?': '+esc(P.blank.map(x=>'row '+x.row+' '+(x.d?fd(x.d):'')+' '+(x.c||'')+' '+(x.t||'')).join('; ')):'')+'.</li>':'')
   +(P.bad.length?'<li class="bad">'+P.bad.length+' line'+(P.bad.length>1?'s':'')+' cannot be read ('+esc(P.bad.slice(0,4).map(x=>x.sheet+' row '+x.row+': '+x.why).join('; '))+').</li>':'')
-  +(clash.length?'<li class="warn">'+clash.length+' of these dates already have sales in the app.</li>':'')+(eDup.length?'<li class="warn">'+eDup.length+' expense'+(eDup.length>1?'s are':' is')+' already in the app (same date, particulars and amount).</li>':'')
+  +(clash.length?'<li class="warn">'+clash.length+' counter slip'+(clash.length>1?'s':'')+' for these dates and counters are already in the app.</li>':'')+(eDup.length?'<li class="warn">'+eDup.length+' expense'+(eDup.length>1?'s are':' is')+' already in the app (same date, particulars and amount).</li>':'')
   +(!dups.length&&!P.blank.length&&!P.bad.length&&!clash.length&&!eDup.length?'<li class="ok">Nothing unusual.</li>':'')+'</ul>'
   +'<div class="grid2">'+(dups.length?fg('Repeated lines','<select id="iDup">'+opt([['keep','Import every line as it is'],['once','Count each repeated line once']],'keep')+'</select>','Keep them if they are separate checks or payments that happen to have the same amount.'):'')
-  +(clash.length?fg('Dates already in the app','<select id="iClash">'+opt([['skip','Skip those dates'],['replace','Replace the app’s slips for those dates']],'skip')+'</select>'):'')
+  +(clash.length?fg('Slips already in the app','<select id="iClash">'+opt([['skip','Keep the app’s slips, skip those lines'],['replace','Replace them with these lines']],'skip')+'</select>'):'')
   +(eDup.length?fg('Expenses already in the app','<select id="iEd">'+opt([['skip','Skip them'],['keep','Import them anyway']],'skip')+'</select>'):'')
-  +fg('Imported days','<select id="iClose">'+opt([['1','Mark as closed (history)'],['0','Leave open']],'1')+'</select>')
+  +fg('Imported days','<select id="iClose">'+opt([['1','Mark as closed (history)'],['0','Leave open to review and close']],fname==='pasted rows'?'0':'1')+'</select>')
   +(P.sales.length?fg('Start counting balances from','<input type="date" id="iStart" value="'+esc(S().start||addDays(last,1))+'">','Cash on hand, Maya, checks and partner balances are counted from this date with the opening balances you enter in Settings › Balances. Imported history before it still shows in reports.'):'')+'</div>'
   +'<div class="acts"><button class="btn o" data-x>Cancel</button><button class="btn" id="iGo">Import</button></div>',820);
  $('#iGo',m).onclick=()=>{
@@ -969,11 +1043,11 @@ function previewImport(P,fname,after){
    const used=[...new Set(P.sales.filter(y=>y.c===c).map(y=>TM[y.t].o.id))],simple=used.every(id=>['cash','kiosk'].includes(optById(id).kind));
    x={id:'k'+uid(),name:c,mode:'Both',opts:simple?used:[],active:true,order:DB.counters.length+1};DB.counters.push(x)}C[c]=x.id});
   const seen=new Set(),use=P.sales.filter(x=>{if(!once)return true;const k=dk(x);if(seen.has(k))return false;seen.add(k);return true});
-  if(rep)DB.slips=DB.slips.filter(s=>!dates.includes(s.date));
+  if(rep){const pr=new Set(P.sales.map(x=>x.d+'|'+C[x.c]));DB.slips=DB.slips.filter(s=>!pr.has(s.date+'|'+s.counter))}
   let ns=0,nl=0,ne=0;const skipD=new Set(rep?[]:clash);
-  use.forEach(x=>{if(skipD.has(x.d))return;let s=slipOf(x.d,C[x.c]);if(!s){s={id:uid(),date:x.d,counter:C[x.c],cashier:'',cf:0,den:{},pu:[],pos:{},man:{},z:null,checks:[],repa:[],note:'',src:'import'};DB.slips.push(s);ns++}
+  use.forEach(x=>{if(skipD.has(x.d+'|'+C[x.c]))return;let s=slipOf(x.d,C[x.c]);if(!s){s={id:uid(),date:x.d,counter:C[x.c],cashier:'',cf:0,den:{},pu:[],pos:{},man:{},z:null,checks:[],repa:[],note:'',src:'import'};DB.slips.push(s);ns++}
    const T=TM[x.t];s[T.md][T.o.id]=(s[T.md][T.o.id]||0)+x.a;if(T.note&&!s.note.includes(x.t))s.note=(s.note?s.note+'; ':'')+x.t+' ₱'+n2(x.a);nl++});
-  if(close)dates.filter(d=>!skipD.has(d)).forEach(d=>DB.days[d]=Object.assign(DB.days[d]||{},{status:'closed',at:new Date().toISOString(),src:'import'}));
+  if(close)[...new Set(use.filter(x=>!skipD.has(x.d+'|'+C[x.c])).map(x=>x.d))].forEach(d=>DB.days[d]=Object.assign(DB.days[d]||{},{status:'closed',at:new Date().toISOString(),src:'import'}));
   cats.forEach(n=>{if(!DB.cats.some(c=>normH(c.name)===normH(n)))DB.cats.push({id:'c'+uid(),name:n,group:''})});
   P.exps.forEach(x=>{const n=(x.mode||'').trim();if(n&&!S().modes.some(z=>normH(z.name)===normH(n)))S().modes.push({name:n,acct:A().cash})});
   P.exps.forEach(x=>{if(edk&&ed.has(x.d+'|'+x.a+'|'+x.part.toLowerCase()))return;const c=x.cat?DB.cats.find(z=>normH(z.name)===normH(x.cat)):null,md=S().modes.find(z=>normH(z.name)===normH(x.mode||''));
@@ -1097,8 +1171,8 @@ const SET={
   $$('[data-r]',B).forEach(i=>i.onchange=()=>{O.recv[i.dataset.r]=c100(i.value);save();toast('Saved.','ok')})},
  imp(B){B.innerHTML='<div class="card"><h2>Import sales and expenses</h2><p>Bring in your existing sheet: an Excel workbook (.xlsx) or CSV with a sales log and an expenses log. The GSVC Daily Sales & Expenses workbook works as it is.</p>'
   +'<ul class="steps"><li><b>Sales lines:</b> Date, Counter, Type, Amount. Types are read as POS or Manual plus the payment option, for example “POS Cash”, “Manual Kiosk”, “Manual REPA”.</li><li><b>Expense lines:</b> Date, Particulars, Mode of Payment, Category, Amount.</li><li>Counters, payment options and categories that are not in the app yet are added.</li><li>You see a summary and anything unusual (repeated lines, lines with no amount) before anything is saved.</li></ul>'
-  +'<input type="file" id="iF" accept=".xlsx,.xlsm,.xls,.csv"></div>';
-  $('#iF').onchange=e=>{const f=e.target.files[0];if(f)importBook(f,()=>go('dash'));e.target.value=''}},
+  +'<div class="row mid"><button class="btn" id="iP">Paste from spreadsheet</button><span class="note">or choose a file:</span><input type="file" id="iF" accept=".xlsx,.xlsm,.xls,.csv"></div></div>';
+  $('#iF').onchange=e=>{const f=e.target.files[0];if(f)importBook(f,()=>go('dash'));e.target.value=''};$('#iP').onclick=()=>openPaste(()=>go('dash'))},
  data(B){const age=backupAge();
   B.innerHTML='<div class="card"><h2>Backup</h2><p>All sales data is stored in this browser on this computer. If the browser’s data is cleared, or the computer fails, it is gone unless you have a backup. Back up every day after closing, and keep copies outside this computer.</p><p class="note">Last backup: '+(DB.meta.lastBackup?esc(new Date(DB.meta.lastBackup).toLocaleString())+(age?' ('+age+' days ago)':''):'never')+'</p><div class="row"><button class="btn" id="dBk">Back up now</button><button class="btn o" id="dBkD">Download a backup file</button></div></div>'
    +'<div class="card"><h2>Backup folder</h2><div id="dFold"></div></div>'
@@ -1155,7 +1229,17 @@ function initNav(){
  document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='\\'){e.preventDefault();$('#menuBtn').click()}});
  $('#bkBtn').onclick=()=>backup();
  window.addEventListener('hashchange',onRoute)}
-(async()=>{await load();initNav();brand();onRoute();$('#saveSt').textContent=hasData()?'All changes saved':'';startAutoBackup()})();
+// show any error on screen instead of a blank page
+window.addEventListener('error',e=>{const v=$('#view');if(v&&!v.children.length)v.innerHTML='<div class="alert">AJ Sales could not start: '+esc(e.message||'unknown error')+'. Close other AJ Sales tabs and reload this page.</div>'});
+// one tab at a time: two tabs would save over each other’s work
+let otherTab=false;
+function tabGuard(){const msg='AJ Sales is open in another tab or window. Use only one, or changes in one will overwrite the other. Close the other tab, then reload this one.';
+ const warn=()=>{if(otherTab)return;otherTab=true;const b=document.createElement('div');b.className='alert warn tabwarn';b.innerHTML=esc(msg)+' <button class="btn s" id="twR">Reload</button>';document.querySelector('.main').prepend(b);$('#twR').onclick=()=>location.reload()};
+ try{const ch=new BroadcastChannel('ajsales');ch.onmessage=e=>{if(e.data==='hello'){ch.postMessage('here');warn()}else if(e.data==='here'||e.data==='saved')warn()};ch.postMessage('hello');window.__ajch=ch}catch(e){}
+ window.addEventListener('storage',e=>{if(e.key===KEY)warn()})}
+(async()=>{initNav();$('#view').innerHTML='<p class="note">Loading…</p>';
+ try{await load();brand();onRoute();$('#saveSt').textContent=hasData()?'All changes saved':'';startAutoBackup();tabGuard()}
+ catch(e){console.error(e);$('#view').innerHTML='<div class="alert">AJ Sales could not load its data: '+esc(e.message)+'. Close other AJ Sales tabs and reload this page.</div>'}})();
 window.AJSALES={DB:()=>DB,save,slipCalc,totals,balances,journal,dayChecks,salesJE,cashBook,parseBook,mapType,autoTick:()=>autoTick(true),changed:()=>changedSinceBackup()};
 
 </script>
